@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import { calcolaAnteprima } from "../src/giochi/biliardo/anteprima";
+import { creaStato } from "../src/giochi/biliardo/regole";
 
 test("desktop: tavolo 3D, controlli, personalizzazione e ciclo umano/bot", async ({
   page,
@@ -123,11 +125,24 @@ test("frecce, mira fine e Spazio; input e finestre non avviano tiri", async ({
   await page.keyboard.press("ArrowLeft");
   await expect(angle).toHaveValue("0");
   await page.keyboard.press("Shift+ArrowRight");
-  expect(Number(await angle.inputValue())).toBeGreaterThan(0);
-  expect(Number(await angle.inputValue())).toBeLessThan(1);
+  await expect(angle).toHaveValue("0.25");
+  await page.keyboard.down("Shift");
+  await expect(page.locator(".fine-aim")).toContainText("Mira fine attiva");
+  await page.keyboard.up("Shift");
+  await page.keyboard.press("s");
+  await expect(page.locator("#power")).toHaveValue("91");
+  await page.keyboard.press("w");
+  await expect(page.locator("#power")).toHaveValue("96");
+  await page.keyboard.press("Shift+s");
+  await expect(page.locator("#power")).toHaveValue("95");
+  await page.keyboard.press("+");
+  await expect(page.locator("#power")).toHaveValue("100");
+  await page.keyboard.press("-");
+  await expect(page.locator("#power")).toHaveValue("95");
+  await page.locator("#power").fill("96");
   await angle.fill("10");
   await angle.press("ArrowUp");
-  await expect(angle).toHaveValue("10.5");
+  await expect(angle).toHaveValue("10.25");
   await angle.press("Space");
   await expect(page.getByRole("button", { name: "Spacca!" })).toBeEnabled();
   await page.getByRole("button", { name: "Come si gioca" }).click();
@@ -143,13 +158,90 @@ test("frecce, mira fine e Spazio; input e finestre non avviano tiri", async ({
   });
 });
 
+test("camera libera: trascinamento, zoom e spostamento non cambiano mira o tirano", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Muovi vista" }).click();
+  const canvas = page.locator("canvas");
+  const rect = (await canvas.boundingBox())!;
+  const original = await canvas.screenshot();
+  await page.mouse.move(rect.x + rect.width * 0.6, rect.y + rect.height * 0.4);
+  await page.mouse.down();
+  await page.mouse.move(
+    rect.x + rect.width * 0.4,
+    rect.y + rect.height * 0.55,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+  const rotated = await canvas.screenshot();
+  expect(rotated.equals(original)).toBe(false);
+  await expect(page.getByLabel("Regola la mira")).toHaveValue("0");
+  await expect(page.locator(".table-bottom")).toContainText("Tiro 1");
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(
+    rect.x + rect.width * 0.5,
+    rect.y + rect.height * 0.55,
+    { steps: 8 },
+  );
+  await page.mouse.up({ button: "right" });
+  const panned = await canvas.screenshot();
+  expect(panned.equals(rotated)).toBe(false);
+  await page.mouse.wheel(0, -180);
+  const zoomed = await canvas.screenshot();
+  expect(zoomed.equals(panned)).toBe(false);
+  await page.getByRole("button", { name: "Reset vista" }).click();
+  const reset = await canvas.screenshot();
+  expect(reset.equals(zoomed)).toBe(false);
+  await page.getByRole("button", { name: "Avvicina vista" }).click();
+  await page.getByRole("button", { name: "Torna alla mira" }).click();
+  await expect(page.getByRole("button", { name: "Spacca!" })).toBeEnabled();
+  await page.keyboard.press("s"); // funziona anche dopo aver premuto un pulsante
+  await expect(page.locator("#power")).toHaveValue("91");
+});
+
+test("anteprima completa: arrivi coerenti con la simulazione e potenza aggiornata", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const canvas = page.locator("canvas");
+  const initial = await canvas.screenshot();
+  await page.getByRole("button", { name: "Traiettoria completa" }).click();
+  const endpoint = (power: number) =>
+    calcolaAnteprima(creaStato(), { angle: 0, power });
+  const label = (p: { x: number; z: number }) =>
+    `X ${p.x.toFixed(2)} · Z ${p.z.toFixed(2)}`;
+  const expected = endpoint(0.96);
+  await expect(page.locator(".preview-white")).toContainText(
+    label(expected.white.final),
+  );
+  await expect(page.locator(".preview-target")).toContainText(
+    `Palla ${expected.target!.id}: ${label(expected.target!.final)}`,
+  );
+  const predicted = await canvas.screenshot();
+  expect(predicted.equals(initial)).toBe(false);
+  await page.keyboard.press("s");
+  await expect(page.locator("#power")).toHaveValue("91");
+  const next = endpoint(0.91);
+  await expect(page.locator(".preview-white")).toContainText(
+    label(next.white.final),
+  );
+  await expect(page.locator(".preview-target")).toContainText(
+    `Palla ${next.target!.id}: ${label(next.target!.final)}`,
+  );
+  await page.getByRole("button", { name: "Traiettoria completa" }).click();
+  await expect(page.locator(".preview-summary")).toHaveCount(0);
+});
+
 test("trascinare la stecca carica potenza, Esc annulla e il rilascio tira", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Vista 3D" }).click();
-  const rect = (await page.locator("canvas").boundingBox())!;
-  const x = rect.x + rect.width * 0.29,
+  const canvas = page.locator("canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  let rect = (await canvas.boundingBox())!;
+  let x = rect.x + rect.width * 0.29,
     y = rect.y + rect.height * 0.5;
   await page.mouse.move(rect.x + rect.width * 0.78, y);
   await page.mouse.move(x, y, { steps: 40 });
@@ -182,6 +274,11 @@ test("trascinare la stecca carica potenza, Esc annulla e il rilascio tira", asyn
   await page.mouse.up();
   await expect(page.getByRole("button", { name: "Spacca!" })).toBeEnabled();
   // Un clic senza trascinamento non esegue un colpo.
+  // Il focus sul pulsante Reset può aver spostato lo scroll della pagina.
+  await canvas.scrollIntoViewIfNeeded();
+  rect = (await canvas.boundingBox())!;
+  x = rect.x + rect.width * 0.29;
+  y = rect.y + rect.height * 0.5;
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.up();
@@ -199,6 +296,42 @@ test("trascinare la stecca carica potenza, Esc annulla e il rilascio tira", asyn
 
 test.describe("comandi touch", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  test("camera touch ruota il tavolo senza modificare il tiro", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Muovi vista" }).click();
+    const canvas = page.locator("canvas");
+    await canvas.scrollIntoViewIfNeeded();
+    const rect = (await canvas.boundingBox())!;
+    const initial = await canvas.screenshot();
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [
+        {
+          x: rect.x + rect.width * 0.65,
+          y: rect.y + rect.height * 0.45,
+          id: 1,
+        },
+      ],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: rect.x + rect.width * 0.4, y: rect.y + rect.height * 0.55, id: 1 },
+      ],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    expect((await canvas.screenshot()).equals(initial)).toBe(false);
+    await expect(page.getByLabel("Regola la mira")).toHaveValue("0");
+    await expect(page.locator(".table-bottom")).toContainText("Tiro 1");
+    await page.getByRole("button", { name: "Torna alla mira" }).click();
+    await expect(page.getByRole("button", { name: "Spacca!" })).toBeEnabled();
+  });
   test("trascinamento sul telefono, annullamento touch e tiro al rilascio", async ({
     page,
   }) => {

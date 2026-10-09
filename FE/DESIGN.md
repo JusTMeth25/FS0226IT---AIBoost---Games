@@ -73,11 +73,13 @@ Pannelli a raggio 15 px; pulsanti 8 px; avatar rotondi. Icone Lucide con tratto 
 
 ## Components
 
-Tavolo: vista 3D/dall'alto, bianca, palle numerate, guida opzionale e stecca arretrabile. La potenza segue il caricamento. Rilascio senza trazione non avvia un tiro.
+Tavolo: camera orbitale controllabile, preset 3D/dall'alto, bianca, palle numerate e stecca arretrabile. La potenza segue il caricamento. Rilascio senza trazione non avvia un tiro. La modalità camera sospende mira e tiro; i controlli della vista stanno in una barra sotto il canvas.
+
+Anteprima: linea chiara per la bianca e ambrata per la prima palla colpita. Cerchi e sfere trasparenti indicano l'arrivo simulato; una legenda testuale rende leggibili anche coordinate e imbucate. Le traiettorie usano la stessa fisica della partita.
 
 Bot: tre pulsanti con avatar, nome, difficoltà e selezione esplicita. Cambio durante una partita richiede una scelta di nuova partita.
 
-Pulsanti e input: focus visibile in ambra, stati disabilitati durante il movimento, etichette italiane e scorciatoie sospese su campi e modali. Canvas focalizzabile; frecce per mira, Shift per regolazione fine, Spazio per tiro, Esc per annullare.
+Pulsanti e input: focus visibile in ambra, stati disabilitati durante il movimento, etichette italiane e scorciatoie sospese su campi e modali. Canvas focalizzabile; frecce per mira, Shift per regolazione fine di 0,25° con indicatore visibile, W/S e +/− per potenza, Spazio per tiro, Esc per annullare. Valore dell'angolo a due decimali.
 
 ## Do's and Don'ts
 

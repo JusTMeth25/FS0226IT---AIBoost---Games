@@ -10,6 +10,9 @@ import {
   Flag,
   Lightbulb,
   Maximize2,
+  Move3D,
+  ZoomIn,
+  ZoomOut,
   MousePointer2,
   PawPrint,
   RotateCcw,
@@ -34,6 +37,9 @@ import {
 } from "./regole";
 import type { Mossa, Palla, Stato, Vec2 } from "./regole";
 import type { StileStecca } from "./scena";
+import type { AzioneCamera } from "./scena";
+import { calcolaAnteprima } from "./anteprima";
+import type { Anteprima, Percorso } from "./anteprima";
 
 type Livello = "facile" | "medio" | "difficile";
 type Stats = { giocate: number; vinte: number; imbucate: number };
@@ -88,6 +94,12 @@ function Pallina({ id, down = false }: { id: number; down?: boolean }) {
   );
 }
 
+function descriviArrivo(route: Percorso) {
+  return route.pocket !== null
+    ? `in buca (${NOMI_BUCHE[route.pocket]})`
+    : `X ${route.final.x.toFixed(2)} · Z ${route.final.z.toFixed(2)}`;
+}
+
 export default function Tavolo({
   onStats,
 }: {
@@ -106,6 +118,18 @@ export default function Tavolo({
   const [placing, setPlacing] = useState(false);
   const [top, setTop] = useState(false);
   const [guide, setGuide] = useState(true);
+  const [extended, setExtended] = useState(false);
+  const [fineAim, setFineAim] = useState(false);
+  const [cameraMode, setCameraMode] = useState(false);
+  const [cameraReset, setCameraReset] = useState(0);
+  const [cameraCommand, setCameraCommand] = useState<{
+    id: number;
+    action: AzioneCamera;
+  } | null>(null);
+  const [predicted, setPredicted] = useState<{
+    key: string;
+    data: Anteprima;
+  } | null>(null);
   const [sound, setSound] = useState(false);
   const [skin, setSkin] = useState<StileStecca>("sakura");
   const [equipment, setEquipment] = useState(false);
@@ -122,9 +146,34 @@ export default function Tavolo({
   const canShoot =
     playerTurn &&
     !placing &&
+    !cameraMode &&
     !equipment &&
     !restart &&
     (!onEight || pocket !== undefined);
+  const previewKey = `${gameId}:${stato.shots}:${angle}:${power}:${pocket}:${placement?.x}:${placement?.z}`;
+  const previewEnabled = extended && playerTurn && !placing;
+  const preview =
+    previewEnabled && predicted?.key === previewKey ? predicted.data : null;
+  useEffect(() => {
+    if (!previewEnabled) return;
+    // Debounce breve: non si ripete la simulazione per ogni evento del mouse.
+    const timer = setTimeout(
+      () =>
+        setPredicted({
+          key: previewKey,
+          data: calcolaAnteprima(stato, {
+            angle,
+            power,
+            calledPocket: pocket,
+            placement,
+          }),
+        }),
+      45,
+    );
+    return () => clearTimeout(timer);
+  }, [previewEnabled, previewKey, stato, angle, power, pocket, placement]);
+  const cameraAction = (action: AzioneCamera) =>
+    setCameraCommand((previous) => ({ id: (previous?.id ?? 0) + 1, action }));
 
   useEffect(
     () => () => {
@@ -243,36 +292,79 @@ export default function Tavolo({
       if (
         event.target instanceof Element &&
         event.target.closest(
-          "input, textarea, select, button, a, summary, [contenteditable='true']",
+          "input, textarea, select, [contenteditable='true']",
         )
       )
         return;
+      if (event.key === "Shift") {
+        setFineAim(true);
+        return;
+      }
       const space = event.code === "Space" || event.key === " ";
+      if (
+        space &&
+        event.target instanceof Element &&
+        event.target.closest("button, a, summary")
+      )
+        return;
+      const powerDirection =
+        event.code === "KeyW" || event.key === "+" || event.key === "="
+          ? 1
+          : event.code === "KeyS" || event.key === "-"
+            ? -1
+            : 0;
       const direction = {
         ArrowLeft: -1,
         ArrowDown: -1,
         ArrowRight: 1,
         ArrowUp: 1,
       }[event.key];
-      if (!space && direction === undefined) return;
+      if (!space && direction === undefined && !powerDirection) return;
       event.preventDefault();
-      if (!playerTurn || placing || charge !== null) return;
+      if (!playerTurn || placing || charge !== null || cameraMode) return;
+      setFineAim(event.shiftKey);
+      if (powerDirection) {
+        setPower((p) =>
+          Math.max(
+            0.08,
+            Math.min(
+              1,
+              Number(
+                (p + powerDirection * (event.shiftKey ? 0.01 : 0.05)).toFixed(
+                  2,
+                ),
+              ),
+            ),
+          ),
+        );
+        return;
+      }
       if (space) {
         if (!event.repeat) humanShot();
       } else
         setAngle((a) =>
           Math.atan2(
             Math.sin(
-              a + (direction! * (event.shiftKey ? 0.15 : 1) * Math.PI) / 180,
+              a + (direction! * (event.shiftKey ? 0.25 : 1) * Math.PI) / 180,
             ),
             Math.cos(
-              a + (direction! * (event.shiftKey ? 0.15 : 1) * Math.PI) / 180,
+              a + (direction! * (event.shiftKey ? 0.25 : 1) * Math.PI) / 180,
             ),
           ),
         );
     };
     window.addEventListener("keydown", keydown);
-    return () => window.removeEventListener("keydown", keydown);
+    const keyup = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setFineAim(false);
+    };
+    const blur = () => setFineAim(false);
+    window.addEventListener("keyup", keyup);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", keydown);
+      window.removeEventListener("keyup", keyup);
+      window.removeEventListener("blur", blur);
+    };
   });
   function chargeCue(value: number | null) {
     setCharge(value);
@@ -284,6 +376,8 @@ export default function Tavolo({
     cancelAnimationFrame(animation.current);
     shotLock.current = false;
     setCharge(null);
+    setCameraMode(false);
+    setFineAim(false);
     setStato(creaStato());
     setFrames(null);
     setBusy(false);
@@ -304,6 +398,7 @@ export default function Tavolo({
   function aimPoint(p: Vec2, click: boolean) {
     if (
       !playerTurn ||
+      cameraMode ||
       charge !== null ||
       document.querySelector("dialog[open]")
     )
@@ -338,17 +433,19 @@ export default function Tavolo({
         ? "Le palle sono in movimento…"
         : stato.turn === 1
           ? `${bot.nome} sta studiando il tiro…`
-          : placing
-            ? "Scegli un punto libero sul panno."
-            : charge !== null
-              ? `Potenza ${Math.round(charge * 100)}%. Rilascia per tirare; Esc annulla.`
-              : stato.ballInHand
-                ? "Palla in mano: puoi riposizionare la bianca."
-                : onEight
-                  ? "È il momento della 8. Dichiara la buca."
-                  : stato.phase === "break"
-                    ? "Si comincia! A te la spaccata."
-                    : "Tocca a te. Trova il tuo angolo.";
+          : cameraMode
+            ? "Muovi vista: trascina per ruotare, rotella per zoom, tasto destro per spostare."
+            : placing
+              ? "Scegli un punto libero sul panno."
+              : charge !== null
+                ? `Potenza ${Math.round(charge * 100)}%. Rilascia per tirare; Esc annulla.`
+                : stato.ballInHand
+                  ? "Palla in mano: puoi riposizionare la bianca."
+                  : onEight
+                    ? "È il momento della 8. Dichiara la buca."
+                    : stato.phase === "break"
+                      ? "Si comincia! A te la spaccata."
+                      : "Tocca a te. Trova il tuo angolo.";
   return (
     <div className="game-layout">
       <section className="table-panel" aria-label="Partita di biliardo">
@@ -449,7 +546,11 @@ export default function Tavolo({
               balls={visibleBalls}
               angle={angle}
               aiming={playerTurn && !placing}
-              guide={guide}
+              guide={guide && !extended}
+              preview={preview}
+              cameraMode={cameraMode}
+              cameraReset={cameraReset}
+              cameraCommand={cameraCommand}
               top={top}
               skin={skin}
               charge={charge}
@@ -459,24 +560,6 @@ export default function Tavolo({
               onRelease={humanShot}
               onPoint={aimPoint}
             />
-          </div>
-          <div className="view-actions">
-            <button
-              className={top ? "selected" : ""}
-              onClick={() => setTop(!top)}
-              aria-pressed={top}
-            >
-              <Maximize2 size={14} />
-              {top ? "Vista dall’alto" : "Vista 3D"}
-            </button>
-            <button
-              className={guide ? "selected" : ""}
-              onClick={() => setGuide(!guide)}
-              aria-pressed={guide}
-            >
-              <Crosshair size={14} />
-              Guida di mira
-            </button>
           </div>
           <div
             className={`turn-notice ${busy || stato.turn === 1 ? "thinking" : ""}`}
@@ -505,6 +588,124 @@ export default function Tavolo({
             </div>
           )}
         </div>
+        <div className="view-actions">
+          <button
+            className={top ? "selected" : ""}
+            onClick={() => setTop(!top)}
+            aria-pressed={top}
+          >
+            <Maximize2 size={14} />
+            {top ? "Vista dall’alto" : "Vista 3D"}
+          </button>
+          <button
+            className={guide ? "selected" : ""}
+            onClick={() => {
+              setGuide(!guide);
+              if (guide) setExtended(false);
+            }}
+            aria-pressed={guide}
+          >
+            <Crosshair size={14} />
+            Guida di mira
+          </button>
+          <button
+            className={extended ? "selected" : ""}
+            aria-pressed={extended}
+            onClick={() => {
+              setExtended(!extended);
+              setGuide(true);
+            }}
+          >
+            <Crosshair size={14} />
+            Traiettoria completa
+          </button>
+          <button
+            className={cameraMode ? "selected" : ""}
+            aria-pressed={cameraMode}
+            onClick={() => setCameraMode(!cameraMode)}
+          >
+            <Move3D size={14} />
+            {cameraMode ? "Torna alla mira" : "Muovi vista"}
+          </button>
+        </div>
+        {cameraMode && (
+          <div className="camera-controls" aria-label="Controlli camera">
+            <span>Trascina: ruota · Destro: sposta · Rotella/pinch: zoom</span>
+            <div>
+              <button
+                className="icon-button"
+                aria-label="Ruota vista a sinistra"
+                onClick={() => cameraAction("left")}
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Ruota vista a destra"
+                onClick={() => cameraAction("right")}
+              >
+                <ArrowRight size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Alza vista"
+                onClick={() => cameraAction("up")}
+              >
+                <ArrowUpRight size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Abbassa vista"
+                onClick={() => cameraAction("down")}
+              >
+                <ArrowDown size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Avvicina vista"
+                onClick={() => cameraAction("in")}
+              >
+                <ZoomIn size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Allontana vista"
+                onClick={() => cameraAction("out")}
+              >
+                <ZoomOut size={16} />
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => setCameraReset((n) => n + 1)}
+              >
+                Reset vista
+              </button>
+            </div>
+          </div>
+        )}
+        {previewEnabled && (
+          <div className="preview-summary" aria-live="polite">
+            <strong>Anteprima del tiro</strong>
+            {preview ? (
+              <>
+                <span className="preview-white">
+                  Bianca: {descriviArrivo(preview.white)}
+                </span>
+                <span className="preview-target">
+                  {preview.target
+                    ? `Palla ${preview.target.id}: ${descriviArrivo(preview.target)}`
+                    : "Nessuna palla colpita"}
+                </span>
+              </>
+            ) : (
+              <span>Calcolo traiettorie…</span>
+            )}
+            <small>
+              Cerchi = arrivo · Stessa fisica del tiro · Include sponde e altri
+              urti
+            </small>
+          </div>
+        )}
         <div className="shot-controls">
           <div className="power-control">
             <label htmlFor="power">
@@ -520,7 +721,7 @@ export default function Tavolo({
               min="8"
               max="100"
               value={Math.round(power * 100)}
-              disabled={!playerTurn || charge !== null}
+              disabled={!playerTurn || charge !== null || cameraMode}
               onChange={(e) => setPower(Number(e.target.value) / 100)}
               style={{ "--fill": `${power * 100}%` } as React.CSSProperties}
             />
@@ -534,7 +735,7 @@ export default function Tavolo({
             <div>
               <button
                 className="icon-button"
-                disabled={!playerTurn || charge !== null}
+                disabled={!playerTurn || charge !== null || cameraMode}
                 aria-label="Mira a sinistra"
                 onClick={() => setAngle((a) => a - Math.PI / 180)}
               >
@@ -543,11 +744,11 @@ export default function Tavolo({
               <input
                 id="angle"
                 type="number"
-                step="0.5"
+                step="0.25"
                 min="-180"
                 max="180"
-                value={Number(((angle * 180) / Math.PI).toFixed(1))}
-                disabled={!playerTurn || charge !== null}
+                value={Number(((angle * 180) / Math.PI).toFixed(2))}
+                disabled={!playerTurn || charge !== null || cameraMode}
                 onChange={(e) =>
                   setAngle(
                     (Math.max(-180, Math.min(180, Number(e.target.value))) *
@@ -559,7 +760,7 @@ export default function Tavolo({
               <span>°</span>
               <button
                 className="icon-button"
-                disabled={!playerTurn || charge !== null}
+                disabled={!playerTurn || charge !== null || cameraMode}
                 aria-label="Mira a destra"
                 onClick={() => setAngle((a) => a + Math.PI / 180)}
               >
@@ -582,6 +783,19 @@ export default function Tavolo({
                   : "Tira"}
             <ArrowUpRight size={20} />
           </button>
+        </div>
+        <div className="keyboard-guide">
+          <span
+            className={fineAim ? "fine-aim active" : "fine-aim"}
+            aria-live="polite"
+          >
+            {fineAim
+              ? "Mira fine attiva · 0,25°"
+              : "Frecce: 1° · Shift + frecce: 0,25°"}
+          </span>
+          <span>
+            W / +: più potenza · S / −: meno potenza · Shift: passi 1%
+          </span>
         </div>
         {stato.ballInHand && playerTurn && (
           <div className="ball-in-hand">

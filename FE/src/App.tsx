@@ -142,11 +142,25 @@ export default function App() {
               regolarla con il puntatore. Afferra la stecca, trascinala indietro
               lungo la sua direzione e rilascia: più la arretri, più il colpo è
               potente. Esc annulla il caricamento. Da tastiera usa le frecce per
-              la mira, Shift + frecce per la regolazione fine e Spazio per
-              tirare con la potenza impostata. Puoi anche usare il pulsante Tira
-              e il cursore di potenza. Le scorciatoie restano sospese mentre
-              compili un campo o apri una finestra. Con palla in mano puoi
-              scegliere un punto sul tavolo oppure le coordinate X/Z.
+              la mira, Shift + frecce per correzioni di 0,25°, W/S o +/− per la
+              potenza (Shift: passi di 1%) e Spazio per tirare con la potenza
+              impostata. Puoi anche usare il pulsante Tira e il cursore di
+              potenza. Le scorciatoie restano sospese mentre compili un campo o
+              apri una finestra. Con palla in mano puoi scegliere un punto sul
+              tavolo oppure le coordinate X/Z.
+            </p>
+            <p>
+              Muovi vista ti permette di ruotare il tavolo trascinando,
+              spostarlo con il tasto destro e zoomare con rotella o due dita.
+              Sono disponibili anche pulsanti camera e Reset vista. Torna alla
+              mira riattiva i comandi di tiro.
+            </p>
+            <p>
+              Traiettoria completa simula il tiro con angolo e potenza correnti:
+              la linea chiara segue la bianca, quella ambrata la prima palla
+              colpita. Cerchi e palle trasparenti mostrano l'arrivo, tenendo
+              conto di sponde e altri urti. La previsione riguarda il movimento
+              fisico prima di eventuali riposizionamenti per fallo o spaccata.
             </p>
             <p className="rules-variant">
               Variante ricreativa: chiami la buca solo per la 8; dopo un fallo

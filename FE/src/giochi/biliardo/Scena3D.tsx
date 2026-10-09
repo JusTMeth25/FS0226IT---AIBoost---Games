@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { creaScena } from "./scena";
-import type { StileStecca } from "./scena";
+import type { StileStecca, AzioneCamera } from "./scena";
+import type { Anteprima } from "./anteprima";
 import type { Palla, Vec2 } from "./regole";
 type Props = {
   balls: Palla[];
   angle: number;
   aiming: boolean;
   guide: boolean;
+  preview: Anteprima | null;
+  cameraMode: boolean;
+  cameraReset: number;
+  cameraCommand: { id: number; action: AzioneCamera } | null;
   top: boolean;
   skin: StileStecca;
   charge: number | null;
@@ -72,7 +77,17 @@ export default function Scena3D(props: Props) {
   }, [props.canStrike, props.gameId]);
   useEffect(() => {
     scene.current?.view(props.top);
-  }, [props.top]);
+  }, [props.top, props.cameraReset]);
+  useEffect(() => {
+    scene.current?.cameraMode(props.cameraMode);
+  }, [props.cameraMode]);
+  useEffect(() => {
+    if (props.cameraCommand)
+      scene.current?.cameraAction(props.cameraCommand.action);
+  }, [props.cameraCommand]);
+  useEffect(() => {
+    scene.current?.preview(props.preview);
+  }, [props.preview]);
   return (
     <div ref={host} className="scene-host">
       {failed && (

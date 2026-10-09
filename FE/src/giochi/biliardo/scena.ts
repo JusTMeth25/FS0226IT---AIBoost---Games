@@ -1,8 +1,11 @@
 import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import type { Anteprima, Percorso } from "./anteprima";
 import { BUCHE, COLORI, R } from "./regole.ts";
 import type { Palla, Vec2 } from "./regole.ts";
 
 export type StileStecca = "sakura" | "tiger" | "noir";
+export type AzioneCamera = "left" | "right" | "up" | "down" | "in" | "out";
 export type ComandiStecca = {
   onCharge: (power: number | null) => void;
   onRelease: (power: number) => void;
@@ -104,6 +107,20 @@ export function creaScena(
     "ArrowLeft ArrowRight ArrowUp ArrowDown Space Escape",
   );
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80);
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.enabled = false;
+  orbit.enableDamping = false;
+  orbit.screenSpacePanning = false;
+  orbit.minPolarAngle = 0.015;
+  orbit.maxPolarAngle = Math.PI / 2 - 0.22;
+  orbit.minDistance = 5;
+  orbit.maxDistance = 35;
+  orbit.maxTargetRadius = 4;
+  orbit.cursor.set(0, -0.15, 0);
+  const render = () => renderer.render(scene, camera);
+  orbit.addEventListener("change", render);
+  let cameraMode = false;
+  let initialized = false;
   let top = false;
   const hemi = new THREE.HemisphereLight("#fff8e9", "#53644f", 2);
   scene.add(hemi);
@@ -314,6 +331,46 @@ export function creaScena(
   );
   targetRing.rotation.x = -Math.PI / 2;
   scene.add(targetRing);
+  const prediction = new THREE.Group();
+  prediction.visible = false;
+  scene.add(prediction);
+  function predictionPath(color: string) {
+    const path = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({
+        color,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.9,
+      }),
+    );
+    path.renderOrder = 5;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(R * 1.15, R * 1.45, 32),
+      new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.9,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.renderOrder = 6;
+    const ghost = new THREE.Mesh(
+      new THREE.SphereGeometry(R, 20, 16),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+      }),
+    );
+    prediction.add(path, ring, ghost);
+    return { path, ring, ghost };
+  }
+  const whitePrediction = predictionPath("#fff8e7");
+  const targetPrediction = predictionPath("#ffc66b");
   let currentBalls: Palla[] = [];
   let currentAngle = 0;
   let canStrike = false;
@@ -334,7 +391,7 @@ export function creaScena(
     commands.onCharge(null);
     renderer.domElement.style.cursor = canStrike ? "crosshair" : "default";
   };
-  const resize = () => {
+  const preset = () => {
     const { width, height } = host.getBoundingClientRect(),
       aspect = width / Math.max(height, 1);
     const distance =
@@ -346,6 +403,16 @@ export function creaScena(
         .multiplyScalar(distance),
     );
     camera.lookAt(0, -0.15, top ? 0 : 0.35);
+    orbit.target.set(0, -0.15, top ? 0 : 0.35);
+    orbit.update();
+  };
+  const resize = () => {
+    const { width, height } = host.getBoundingClientRect();
+    camera.aspect = width / Math.max(height, 1);
+    if (!initialized) {
+      preset();
+      initialized = true;
+    }
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
     renderer.render(scene, camera);
@@ -389,6 +456,7 @@ export function creaScena(
     commands.onCharge(drag.power);
   };
   const move = (event: PointerEvent) => {
+    if (cameraMode) return;
     if (drag) {
       event.preventDefault();
       updateCharge(event);
@@ -404,6 +472,7 @@ export function creaScena(
   const click = (event: PointerEvent) => {
     if (
       !event.isPrimary ||
+      cameraMode ||
       event.button !== 0 ||
       document.querySelector("dialog[open]")
     )
@@ -538,7 +607,70 @@ export function creaScena(
     view(value: boolean) {
       cancel();
       top = value;
+      preset();
       resize();
+    },
+    cameraMode(enabled: boolean) {
+      cancel();
+      cameraMode = enabled;
+      orbit.enabled = enabled;
+      renderer.domElement.style.cursor = enabled ? "grab" : "crosshair";
+    },
+    cameraAction(action: AzioneCamera) {
+      cancel();
+      const relative = camera.position.clone().sub(orbit.target);
+      if (action === "in" || action === "out") {
+        relative.setLength(
+          Math.max(
+            orbit.minDistance,
+            Math.min(
+              orbit.maxDistance,
+              relative.length() * (action === "in" ? 0.85 : 1.15),
+            ),
+          ),
+        );
+      } else {
+        const spherical = new THREE.Spherical().setFromVector3(relative);
+        if (action === "left" || action === "right")
+          spherical.theta += action === "left" ? -0.15 : 0.15;
+        else
+          spherical.phi = Math.max(
+            orbit.minPolarAngle,
+            Math.min(
+              orbit.maxPolarAngle,
+              spherical.phi + (action === "up" ? -0.1 : 0.1),
+            ),
+          );
+        relative.setFromSpherical(spherical);
+      }
+      camera.position.copy(orbit.target).add(relative);
+      orbit.update();
+      render();
+    },
+    preview(value: Anteprima | null) {
+      prediction.visible = value !== null;
+      if (value) {
+        const update = (
+          meshes: ReturnType<typeof predictionPath>,
+          route: Percorso | null,
+        ) => {
+          meshes.path.visible =
+            meshes.ring.visible =
+            meshes.ghost.visible =
+              route !== null;
+          if (!route) return;
+          meshes.path.geometry.dispose();
+          meshes.path.geometry = new THREE.BufferGeometry().setFromPoints(
+            route.points.map((p) => new THREE.Vector3(p.x, 0.22, p.z)),
+          );
+          meshes.ring.position.set(route.final.x, 0.074, route.final.z);
+          meshes.ghost.position.set(route.final.x, 0.2, route.final.z);
+          meshes.ghost.visible = !route.final.pocketed;
+        };
+        update(whitePrediction, value.white);
+        update(targetPrediction, value.target);
+      }
+      render();
     },
     interaction(enabled: boolean, id: number) {
       canStrike = enabled;
@@ -550,6 +682,8 @@ export function creaScena(
       drag = null;
       aimingPointer = null;
       observer.disconnect();
+      orbit.removeEventListener("change", render);
+      orbit.dispose();
       renderer.domElement.removeEventListener("pointermove", move);
       renderer.domElement.removeEventListener("pointerdown", click);
       renderer.domElement.removeEventListener("pointerup", release);

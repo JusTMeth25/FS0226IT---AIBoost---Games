@@ -52,11 +52,13 @@ Ogni integrazione ha superato `verifica.ts` e build, in sequenza. Nessun conflit
 ## Comandi e interazione
 
 - Clic/tap sul panno fissa la mira; tenendo premuto si può regolarla con il puntatore. L'hover non sposta la stecca mentre ci si avvicina per afferrarla. Afferra la stecca, trascina indietro lungo il suo asse e rilascia per tirare. La distanza controlla la potenza; una semplice pressione non tira. Pointer capture mantiene il trascinamento anche fuori dal canvas.
-- Frecce sinistra/giù e destra/su: rotazione della mira di 1 grado, Shift riduce il passo a 0,15 gradi. Spazio tira con la potenza impostata; auto-repeat non produce colpi multipli.
+- Frecce sinistra/giù e destra/su: rotazione della mira di 1 grado, Shift riduce il passo a 0,25 gradi. Campo angolo a due decimali e indicatore di mira fine. W/+ e S/− modificano la potenza di 5 punti percentuali, Shift riduce il passo a 1 punto. Spazio tira con la potenza impostata; auto-repeat non produce colpi multipli.
 - Esc, perdita del focus, annullamento del puntatore o cambio vista: annullano il caricamento. Input e dialoghi conservano i propri comandi; durante il tiro o il turno del bot le azioni umane sono bloccate.
 - Una nuova partita invalida anche il gesto interno del renderer: rilasciare un trascinamento precedente non tira nel nuovo stato.
 - Alternativa da tastiera: campo angolo, potenza, pulsante Tira, coordinate X/Z per la palla in mano e scelta della buca sulla 8.
 - Tre stecche cosmetiche: Zampa di rosa, Micio tigrato, Notte felina. Camera 3D o dall'alto, guida di mira e suono facoltativo.
+- Muovi vista abilita OrbitControls: rotazione con trascinamento, pan con tasto destro, zoom con rotella; touch a uno/due dita. Pulsanti per orientamento e zoom, Reset vista, Torna alla mira. Mira e tiro sospesi durante il controllo della camera. Il resize conserva la vista corrente; selezionare un preset o Reset vista la ripristina.
+- Traiettoria completa usa la stessa simulazione del tiro, con un debounce di 45 ms durante le regolazioni. Mostra il percorso fino all'arresto, arrivo e imbucata della bianca e della prima palla toccata. Gli urti successivi con tutte le palle sono inclusi; i riposizionamenti imposti dall'arbitraggio avvengono dopo il movimento previsto.
 
 ## Verifica e limiti
 
@@ -74,9 +76,9 @@ Skill applicate da copie locali dei repository ufficiali [Superpowers](https://g
 
 ## Esito finale delle verifiche
 
-- Regole e contratti: **11 verifiche superate**, tutti e tre i bot integrati.
+- Regole, contratti e coerenza anteprima/tiro: **12 verifiche superate**, tutti e tre i bot integrati.
 - Torneo: **medio 8–0 facile**, **difficile 8–0 medio**, nessun pareggio nei seed dichiarati.
-- Browser Chromium: **6 test superati** su desktop/mobile, con input mouse e touch, tastiera, finestre, worker e reset durante il caricamento.
+- Browser Chromium: **9 casi verificati** su desktop/mobile, con input mouse e touch, tastiera, finestre, worker, reset durante il caricamento, camera libera e anteprima completa. Il trascinamento dopo reset e la camera touch sono stati confermati con una successiva esecuzione mirata.
 - TypeScript e build produzione: passati. ESLint: nessun errore. Rimane il messaggio informativo di Vite sulla dimensione del bundle che include Three.js.
 - Revisione separata, in sola lettura, dello stesso sottoagente del bot facile: tre rilievi risolti. Mira stabile durante l'avvicinamento alla stecca; reset invalida il trascinamento; testo secondario con contrasto 4,694:1. Il verdetto copre queste tre correzioni.
 - Documentazione completata: README, PRODUCT, DESIGN, sidecar Impeccable e questo piano. Screenshot desktop e mobile ispezionati con tavolo interamente visibile.

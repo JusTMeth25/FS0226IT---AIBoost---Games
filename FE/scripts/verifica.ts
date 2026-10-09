@@ -9,6 +9,7 @@ import {
   simulaTiro,
 } from "../src/giochi/biliardo/regole.ts";
 import type { Bot, Esito, Stato } from "../src/giochi/biliardo/regole.ts";
+import { calcolaAnteprima } from "../src/giochi/biliardo/anteprima.ts";
 
 let checks = 0;
 function check(name: string, run: () => void) {
@@ -154,6 +155,52 @@ check("8 prematura perde; 8 dichiarata vince; scratch sulla 8 perde", () => {
     1,
   );
 });
+check(
+  "anteprima: stessi arrivi del tiro, sponde, nessun contatto e palla in mano",
+  () => {
+    const dispersed = applicaMossa(base, { angle: 0, power: 0.96 });
+    for (const [state, move] of [
+      [base, { angle: 0, power: 0.96 }],
+      [base, { angle: Math.PI, power: 0.48 }],
+      [dispersed, { angle: 0.38, power: 0.6, calledPocket: 0 }],
+      [
+        { ...dispersed, ballInHand: true },
+        {
+          angle: 0.7,
+          power: 0.5,
+          calledPocket: 0,
+          placement: { x: -4, z: -1.5 },
+        },
+      ],
+    ] as const) {
+      const before = JSON.stringify(state);
+      const predicted = calcolaAnteprima(state, move),
+        actual = simulaTiro(state, move);
+      assert.deepEqual(
+        predicted.white.final,
+        actual.balls.find((b) => b.id === 0),
+      );
+      assert.equal(predicted.target?.id ?? null, actual.firstContact);
+      if (predicted.target)
+        assert.deepEqual(
+          predicted.target.final,
+          actual.balls.find((b) => b.id === actual.firstContact),
+        );
+      for (const route of [predicted.white, predicted.target])
+        if (route) {
+          assert.deepEqual(route.points.at(-1), {
+            x: route.final.x,
+            z: route.final.z,
+          });
+          assert.equal(
+            route.pocket,
+            actual.pocketed.find((b) => b.id === route.id)?.pocket ?? null,
+          );
+        }
+      assert.equal(JSON.stringify(state), before);
+    }
+  },
+);
 export function seeded(seed: number) {
   return () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;

@@ -17,7 +17,11 @@ Apri l'indirizzo stampato da Vite, normalmente `http://localhost:5173`. Per la v
 
 Scegli Milo (facile), Luna (medio) o Nero (difficile). Clicca/tocca il panno per fissare la mira; puoi regolarla tenendo premuto e trascinando sul panno. Afferra la stecca, arretrala lungo il suo asse e rilascia per tirare: la distanza regola la potenza. Un semplice clic sulla stecca non tira. Esc annulla la carica.
 
-Le frecce ruotano la mira di un grado; Shift + frecce fanno una correzione fine. Spazio tira con la potenza impostata. Sono disponibili anche cursore di potenza, campo angolo e pulsante Tira. Le scorciatoie non interferiscono con campi e dialoghi; durante il turno del bot e il movimento delle palle i comandi di tiro sono disabilitati.
+Le frecce ruotano la mira di un grado; Shift + frecce fanno una correzione di **0,25°**, visibile nel campo a due decimali e nell'indicatore di mira fine. **W/+** aumenta la potenza e **S/−** la diminuisce di 5 punti percentuali; con Shift il passo è di 1 punto. **Spazio** tira con la potenza impostata. Sono disponibili anche cursore di potenza, campo angolo e pulsante Tira. Le scorciatoie non interferiscono con campi e dialoghi; durante il turno del bot, il movimento delle palle e la modalità camera i comandi di tiro sono disabilitati.
+
+**Muovi vista** attiva la camera libera: trascina per ruotare intorno al tavolo, usa il tasto destro per spostare l'inquadratura e la rotella per zoomare. Su touch: un dito ruota, due dita spostano e zoomano. I pulsanti camera consentono le stesse regolazioni da tastiera; **Reset vista** ripristina l'inquadratura. **Torna alla mira** riattiva il tiro senza perdere l'angolo e la potenza scelti. Il ridimensionamento della finestra conserva la camera spostata.
+
+**Traiettoria completa** estende la guida fino all'arresto. La linea chiara mostra il percorso della bianca, quella ambrata la prima palla colpita; cerchi e palle trasparenti ne segnano l'arrivo. L'anteprima usa esattamente `simulaTiro`, lo stesso stato, angolo, potenza e piazzamento del tiro reale: include attrito, sponde, urti successivi e imbucate. La legenda riporta coordinate finali o buca di arrivo. La previsione riguarda il movimento fisico prima dell'arbitraggio: una bianca imbucata o la 8 imbucata sulla spaccata possono essere successivamente riposizionate dalle regole.
 
 Con palla in mano, scegli una posizione libera con il puntatore o i campi X/Z. Prima del tiro finale dichiara la buca della 8 nel menu. Puoi cambiare stecca, attivare i suoni, disattivare la guida e passare alla vista dall'alto. Le statistiche sono conservate in questo browser.
 
@@ -45,6 +49,7 @@ src/giochi/biliardo/
   Tavolo.tsx      Partita, turni e controlli React
   Scena3D.tsx     Collegamento React/Three.js
   scena.ts        Tavolo, texture, stecca e interazioni 3D
+  anteprima.ts    Percorsi e arrivi dalla stessa simulazione della partita
   bot.worker.ts  Esecuzione dei bot fuori dal thread della UI
   bot/
     facile.ts    Milo: geometria casuale con imprecisione
