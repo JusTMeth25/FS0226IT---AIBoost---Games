@@ -46,7 +46,7 @@ type Stats = { giocate: number; vinte: number; imbucate: number };
 export type { Stats };
 const avversari = {
   facile: {
-    nome: "Milo",
+    nome: "Titino",
     testo: "Qualche tiro fortunato, tante pause per le coccole.",
     color: "#c79772",
     variant: "sleepy" as const,
@@ -55,12 +55,12 @@ const avversari = {
   medio: {
     nome: "Luna",
     testo: "Studia gli angoli. E ogni tanto ti lascia uno spiraglio.",
-    color: "#abb7ae",
+    color: "#010101",
     variant: "happy" as const,
     dots: 2,
   },
   difficile: {
-    nome: "Nero",
+    nome: "Grey",
     testo: "Pensa al prossimo tiro prima di imbucare questo.",
     color: "#747f79",
     variant: "cool" as const,
