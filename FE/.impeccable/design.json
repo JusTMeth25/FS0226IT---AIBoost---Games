@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-09T00:00:00+02:00",
+  "title": "Design System: Micio Club",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Verde del club" },
+      "neutral-bg": { "role": "neutral", "displayName": "Carta crema" }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Titolo serif",
+        "purpose": "Marchio, titolo della sala e dialoghi"
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel",
+        "value": "0 5px 16px #28372a06",
+        "purpose": "Profondità discreta del pannello di gioco"
+      }
+    ],
+    "motion": [
+      {
+        "name": "control",
+        "value": "0.18s ease",
+        "purpose": "Stati dei controlli; ridotto con prefers-reduced-motion"
+      }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "580px" },
+      { "name": "stacked", "value": "900px" },
+      { "name": "compact", "value": "1150px" },
+      { "name": "wide", "value": "1500px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Tiro",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Avvia il tiro con la potenza impostata.",
+      "html": "<button class=\"ds-shot\">Tira</button>",
+      "css": ".ds-shot{background:var(--green,#294c3c);color:#fffaf0;border:0;border-radius:8px;padding:14px 21px;font:500 12px 'DM Sans',sans-serif;cursor:pointer}.ds-shot:hover{background:#366049}.ds-shot:focus-visible{outline:3px solid #b97857;outline-offset:4px}.ds-shot:disabled{opacity:.48;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondario",
+      "kind": "button",
+      "description": "Azione secondaria nei dialoghi.",
+      "html": "<button class=\"ds-secondary\">Continua questa</button>",
+      "css": ".ds-secondary{border:1px solid #d8dfcc;background:#f0f3e7;color:#294c3c;padding:12px 16px;border-radius:8px;font:12px 'DM Sans',sans-serif;cursor:pointer}.ds-secondary:hover{background:#e7edda}.ds-secondary:focus-visible{outline:3px solid #b97857;outline-offset:4px}"
+    },
+    {
+      "name": "Campo angolo",
+      "kind": "input",
+      "description": "Alternativa precisa per la mira.",
+      "html": "<label class=\"ds-angle\">Regola la mira <input aria-label=\"Angolo\" type=\"number\" value=\"0\" step=\"0.5\"/></label>",
+      "css": ".ds-angle{font:12px 'DM Sans',sans-serif;color:#294c3c}.ds-angle input{width:64px;margin-left:8px;padding:7px;background:#fffdf5;color:#294c3c;border:1px solid #cdd6c3;border-radius:4px}.ds-angle input:focus-visible{outline:3px solid #b97857;outline-offset:4px}"
+    },
+    {
+      "name": "Navigazione",
+      "kind": "nav",
+      "description": "Sala, istruzioni e risultati.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#sala\" aria-current=\"page\">La sala</a><button>Come si gioca</button></nav>",
+      "css": ".ds-nav{display:flex;gap:30px;font:13px 'DM Sans',sans-serif}.ds-nav a,.ds-nav button{color:#6d7365;background:none;border:0;padding:10px 0;text-decoration:none;font:inherit;cursor:pointer}.ds-nav [aria-current]{color:#294c3c;border-bottom:3px solid #294c3c}.ds-nav a:hover,.ds-nav button:hover{color:#bf7658}.ds-nav a:focus-visible,.ds-nav button:focus-visible{outline:3px solid #b97857;outline-offset:4px}"
+    },
+    {
+      "name": "Variante gioco",
+      "kind": "chip",
+      "description": "Tipo di biliardo corrente.",
+      "html": "<span class=\"ds-tag\">Palla a 8</span>",
+      "css": ".ds-tag{padding:5px 9px;border-radius:5px;background:#f0f1e9;color:#656d59;font:10px 'DM Sans',sans-serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Un tavolo tra amici felini",
+    "overview": "Il club accogliente è una scelta confermata dall'utente. Carta crema, verde del panno, legno e ottone della scena 3D creano continuità tra gioco e comandi. L'artefatto principale è il tavolo giocabile; la cornice lascia spazio al tiro.",
+    "keyCharacteristics": [
+      "Titoli serif morbidi e comandi sans leggibili.",
+      "Gatti disegnati in SVG e impronte sulle texture procedurali.",
+      "Stato del turno, potenza e azione disponibili attorno al tavolo."
+    ],
+    "rules": [],
+    "dos": [
+      "Do conservare il club accogliente e il tavolo come elemento principale.",
+      "Do mantenere numero e fascia sulle palle oltre al colore.",
+      "Do spiegare controlli, falli e variante ricreativa nel linguaggio del gioco."
+    ],
+    "donts": [
+      "Don't introdurre dettagli di orchestrazione nei comandi del giocatore.",
+      "Don't sostituire l'identità felina con decorazioni generiche da dashboard."
+    ]
+  }
+}

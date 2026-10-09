@@ -99,6 +99,8 @@ export default function Tavolo({
   const [livello, setLivello] = useState<Livello>("facile");
   const [angle, setAngle] = useState(0);
   const [power, setPower] = useState(0.96);
+  const [charge, setCharge] = useState<number | null>(null);
+  const [gameId, setGameId] = useState(0);
   const [pocket, setPocket] = useState<number | undefined>();
   const [placement, setPlacement] = useState<Vec2 | undefined>();
   const [placing, setPlacing] = useState(false);
@@ -111,12 +113,18 @@ export default function Tavolo({
   const [help, setHelp] = useState(true);
   const [botError, setBotError] = useState(false);
   const animation = useRef(0);
+  const shotLock = useRef(false);
   const audio = useRef<AudioContext | null>(null);
   const match = useRef(0);
   const bot = avversari[livello];
   const playerTurn = stato.turn === 0 && !busy && stato.phase !== "finished";
   const onEight = bersagli(stato)[0]?.id === 8;
-  const canShoot = playerTurn && !placing && (!onEight || pocket !== undefined);
+  const canShoot =
+    playerTurn &&
+    !placing &&
+    !equipment &&
+    !restart &&
+    (!onEight || pocket !== undefined);
 
   useEffect(
     () => () => {
@@ -148,11 +156,13 @@ export default function Tavolo({
   }
   const shoot = useCallback(
     (move: Mossa, source: Stato = stato) => {
-      if (!mossaValida(source, move)) return;
+      if (shotLock.current || !mossaValida(source, move)) return;
+      shotLock.current = true;
       const result = simulaTiro(source, move, true),
         next = risolviTiro(source, move, result);
       const id = match.current;
       setBusy(true);
+      setCharge(null);
       setPlacement(undefined);
       setPlacing(false);
       const start = performance.now();
@@ -166,6 +176,7 @@ export default function Tavolo({
           setFrames(null);
           setStato(next);
           setBusy(false);
+          shotLock.current = false;
           setPocket(undefined);
           setPower(0.48);
           if (source.turn === 0)
@@ -184,14 +195,18 @@ export default function Tavolo({
       type: "module",
     });
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const requestId = match.current;
     const started = performance.now();
     worker.onmessage = (event) => {
+      if (requestId !== match.current) return;
       if (event.data.error || !mossaValida(stato, event.data.mossa)) {
         setBotError(true);
         return;
       }
       timer = setTimeout(
-        () => shoot(event.data.mossa, stato),
+        () => {
+          if (requestId === match.current) shoot(event.data.mossa, stato);
+        },
         Math.max(0, 800 - (performance.now() - started)),
       );
     };
@@ -203,15 +218,72 @@ export default function Tavolo({
     };
   }, [stato, livello, busy, shoot, botError]);
 
-  const humanShot = () => {
-    if (canShoot) {
+  const humanShot = (chargedPower?: number) => {
+    if (canShoot && !document.querySelector("dialog[open]")) {
       playSound();
-      shoot({ angle, power, calledPocket: pocket, placement });
+      shoot({
+        angle,
+        power: chargedPower ?? power,
+        calledPocket: pocket,
+        placement,
+      });
     }
   };
+  // I campi e le finestre conservano i loro comandi nativi; le scorciatoie
+  // agiscono soltanto sul tavolo e non possono tirare durante il turno del bot.
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        document.querySelector("dialog[open]")
+      )
+        return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          "input, textarea, select, button, a, summary, [contenteditable='true']",
+        )
+      )
+        return;
+      const space = event.code === "Space" || event.key === " ";
+      const direction = {
+        ArrowLeft: -1,
+        ArrowDown: -1,
+        ArrowRight: 1,
+        ArrowUp: 1,
+      }[event.key];
+      if (!space && direction === undefined) return;
+      event.preventDefault();
+      if (!playerTurn || placing || charge !== null) return;
+      if (space) {
+        if (!event.repeat) humanShot();
+      } else
+        setAngle((a) =>
+          Math.atan2(
+            Math.sin(
+              a + (direction! * (event.shiftKey ? 0.15 : 1) * Math.PI) / 180,
+            ),
+            Math.cos(
+              a + (direction! * (event.shiftKey ? 0.15 : 1) * Math.PI) / 180,
+            ),
+          ),
+        );
+    };
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  });
+  function chargeCue(value: number | null) {
+    setCharge(value);
+    if (value !== null) setPower(Math.max(0.08, value));
+  }
   function reset(nextLevel: Livello) {
+    setGameId((id) => id + 1);
     match.current++;
     cancelAnimationFrame(animation.current);
+    shotLock.current = false;
+    setCharge(null);
     setStato(creaStato());
     setFrames(null);
     setBusy(false);
@@ -230,7 +302,12 @@ export default function Tavolo({
     else reset(nextLevel);
   }
   function aimPoint(p: Vec2, click: boolean) {
-    if (!playerTurn) return;
+    if (
+      !playerTurn ||
+      charge !== null ||
+      document.querySelector("dialog[open]")
+    )
+      return;
     if (placing) {
       if (click && posizioneValida(stato, p)) {
         setPlacement(p);
@@ -263,13 +340,15 @@ export default function Tavolo({
           ? `${bot.nome} sta studiando il tiro…`
           : placing
             ? "Scegli un punto libero sul panno."
-            : stato.ballInHand
-              ? "Palla in mano: puoi riposizionare la bianca."
-              : onEight
-                ? "È il momento della 8. Dichiara la buca."
-                : stato.phase === "break"
-                  ? "Si comincia! A te la spaccata."
-                  : "Tocca a te. Trova il tuo angolo.";
+            : charge !== null
+              ? `Potenza ${Math.round(charge * 100)}%. Rilascia per tirare; Esc annulla.`
+              : stato.ballInHand
+                ? "Palla in mano: puoi riposizionare la bianca."
+                : onEight
+                  ? "È il momento della 8. Dichiara la buca."
+                  : stato.phase === "break"
+                    ? "Si comincia! A te la spaccata."
+                    : "Tocca a te. Trova il tuo angolo.";
   return (
     <div className="game-layout">
       <section className="table-panel" aria-label="Partita di biliardo">
@@ -373,6 +452,11 @@ export default function Tavolo({
               guide={guide}
               top={top}
               skin={skin}
+              charge={charge}
+              gameId={gameId}
+              canStrike={canShoot}
+              onCharge={chargeCue}
+              onRelease={humanShot}
               onPoint={aimPoint}
             />
           </div>
@@ -436,7 +520,7 @@ export default function Tavolo({
               min="8"
               max="100"
               value={Math.round(power * 100)}
-              disabled={!playerTurn}
+              disabled={!playerTurn || charge !== null}
               onChange={(e) => setPower(Number(e.target.value) / 100)}
               style={{ "--fill": `${power * 100}%` } as React.CSSProperties}
             />
@@ -450,7 +534,7 @@ export default function Tavolo({
             <div>
               <button
                 className="icon-button"
-                disabled={!playerTurn}
+                disabled={!playerTurn || charge !== null}
                 aria-label="Mira a sinistra"
                 onClick={() => setAngle((a) => a - Math.PI / 180)}
               >
@@ -463,7 +547,7 @@ export default function Tavolo({
                 min="-180"
                 max="180"
                 value={Number(((angle * 180) / Math.PI).toFixed(1))}
-                disabled={!playerTurn}
+                disabled={!playerTurn || charge !== null}
                 onChange={(e) =>
                   setAngle(
                     (Math.max(-180, Math.min(180, Number(e.target.value))) *
@@ -475,7 +559,7 @@ export default function Tavolo({
               <span>°</span>
               <button
                 className="icon-button"
-                disabled={!playerTurn}
+                disabled={!playerTurn || charge !== null}
                 aria-label="Mira a destra"
                 onClick={() => setAngle((a) => a + Math.PI / 180)}
               >
@@ -485,8 +569,9 @@ export default function Tavolo({
           </div>
           <button
             className="shoot-button"
-            disabled={!canShoot}
-            onClick={humanShot}
+            disabled={!canShoot || charge !== null}
+            onClick={() => humanShot()}
+            aria-keyshortcuts="Space"
           >
             {busy
               ? "In movimento"
@@ -578,7 +663,8 @@ export default function Tavolo({
         )}
         <div className="table-bottom">
           <span>
-            <MousePointer2 size={14} /> Muovi il puntatore per mirare, poi tira.
+            <MousePointer2 size={14} /> Trascina e rilascia la stecca · Frecce:
+            mira · Spazio: tira
           </span>
           <span>
             Tiro {stato.shots + 1}
@@ -678,15 +764,15 @@ export default function Tavolo({
           </div>
           <div className="guide-step">
             <MousePointer2 size={17} />
-            <span>Punta sul tavolo</span>
+            <span>Mira con mouse o frecce</span>
           </div>
           <div className="guide-step">
             <ArrowDown size={17} />
-            <span>Dosane la potenza</span>
+            <span>Trascina la stecca indietro</span>
           </div>
           <div className="guide-step">
             <Flag size={17} />
-            <span>La 8, per ultima</span>
+            <span>Rilascia, oppure premi spazio</span>
           </div>
           <button
             className="icon-button"

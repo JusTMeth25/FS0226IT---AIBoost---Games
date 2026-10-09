@@ -9,19 +9,39 @@ type Props = {
   guide: boolean;
   top: boolean;
   skin: StileStecca;
+  charge: number | null;
+  gameId: number;
+  canStrike: boolean;
+  onCharge: (power: number | null) => void;
+  onRelease: (power: number) => void;
   onPoint: (p: Vec2, click: boolean) => void;
 };
 export default function Scena3D(props: Props) {
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<ReturnType<typeof creaScena> | null>(null);
-  const handler = useRef(props.onPoint);
+  const handler = useRef({
+    point: props.onPoint,
+    charge: props.onCharge,
+    release: props.onRelease,
+  });
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    handler.current = props.onPoint;
-  }, [props.onPoint]);
+    handler.current = {
+      point: props.onPoint,
+      charge: props.onCharge,
+      release: props.onRelease,
+    };
+  }, [props.onPoint, props.onCharge, props.onRelease]);
   useEffect(() => {
     try {
-      scene.current = creaScena(host.current!, (p, c) => handler.current(p, c));
+      scene.current = creaScena(
+        host.current!,
+        (p, c) => handler.current.point(p, c),
+        {
+          onCharge: (p) => handler.current.charge(p),
+          onRelease: (p) => handler.current.release(p),
+        },
+      );
     } catch {
       queueMicrotask(() => setFailed(true));
     }
@@ -32,8 +52,24 @@ export default function Scena3D(props: Props) {
   }, []);
   useEffect(() => {
     scene.current?.balls(props.balls);
-    scene.current?.aim(props.angle, props.aiming, props.guide, props.skin);
-  }, [props.balls, props.angle, props.aiming, props.guide, props.skin]);
+    scene.current?.aim(
+      props.angle,
+      props.aiming,
+      props.guide,
+      props.skin,
+      props.charge,
+    );
+  }, [
+    props.balls,
+    props.angle,
+    props.aiming,
+    props.guide,
+    props.skin,
+    props.charge,
+  ]);
+  useEffect(() => {
+    scene.current?.interaction(props.canStrike, props.gameId);
+  }, [props.canStrike, props.gameId]);
   useEffect(() => {
     scene.current?.view(props.top);
   }, [props.top]);

@@ -3,6 +3,10 @@ import { BUCHE, COLORI, R } from "./regole.ts";
 import type { Palla, Vec2 } from "./regole.ts";
 
 export type StileStecca = "sakura" | "tiger" | "noir";
+export type ComandiStecca = {
+  onCharge: (power: number | null) => void;
+  onRelease: (power: number) => void;
+};
 const skins = {
   sakura: ["#edd8bf", "#ba6474"],
   tiger: ["#bd7e43", "#423127"],
@@ -79,6 +83,7 @@ function ballTexture(id: number) {
 export function creaScena(
   host: HTMLDivElement,
   onPoint: (p: Vec2, click: boolean) => void,
+  commands: ComandiStecca,
 ) {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -90,9 +95,14 @@ export function creaScena(
   host.appendChild(renderer.domElement);
   renderer.domElement.setAttribute(
     "aria-label",
-    "Tavolo da biliardo 3D. Muovi il puntatore per mirare e usa il pulsante Tira.",
+    "Tavolo da biliardo 3D. Clicca o tocca il panno per mirare. Trascina indietro la stecca e rilasciala per tirare. Frecce per mirare, spazio per tirare.",
   );
   renderer.domElement.setAttribute("role", "img");
+  renderer.domElement.tabIndex = 0;
+  renderer.domElement.setAttribute(
+    "aria-keyshortcuts",
+    "ArrowLeft ArrowRight ArrowUp ArrowDown Space Escape",
+  );
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80);
   let top = false;
   const hemi = new THREE.HemisphereLight("#fff8e9", "#53644f", 2);
@@ -305,18 +315,37 @@ export function creaScena(
   targetRing.rotation.x = -Math.PI / 2;
   scene.add(targetRing);
   let currentBalls: Palla[] = [];
+  let currentAngle = 0;
+  let canStrike = false;
+  let gameId = -1;
+  let aimingPointer: number | null = null;
+  let drag: {
+    pointerId: number;
+    anchor: Vec2;
+    angle: number;
+    power: number;
+  } | null = null;
+  const cancelDrag = () => {
+    if (!drag) return;
+    const pointerId = drag.pointerId;
+    drag = null;
+    if (renderer.domElement.hasPointerCapture(pointerId))
+      renderer.domElement.releasePointerCapture(pointerId);
+    commands.onCharge(null);
+    renderer.domElement.style.cursor = canStrike ? "crosshair" : "default";
+  };
   const resize = () => {
     const { width, height } = host.getBoundingClientRect(),
       aspect = width / Math.max(height, 1);
     const distance =
-      Math.max(top ? 6.8 : 5.9, 14.4 / aspect) / (2 * Math.tan(Math.PI / 10));
+      Math.max(top ? 6.8 : 7, 14.4 / aspect) / (2 * Math.tan(Math.PI / 10));
     camera.aspect = aspect;
     camera.position.copy(
       new THREE.Vector3(top ? 0 : 0.065, top ? 1 : 0.79, top ? 0.001 : 0.61)
         .normalize()
         .multiplyScalar(distance),
     );
-    camera.lookAt(0, -0.15, 0);
+    camera.lookAt(0, -0.15, top ? 0 : 0.35);
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
     renderer.render(scene, camera);
@@ -325,7 +354,7 @@ export function creaScena(
   observer.observe(host);
   const raycaster = new THREE.Raycaster(),
     plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.2);
-  const pointer = (event: PointerEvent, click: boolean) => {
+  const pointerPoint = (event: PointerEvent): Vec2 | null => {
     const rect = renderer.domElement.getBoundingClientRect();
     raycaster.setFromCamera(
       new THREE.Vector2(
@@ -335,12 +364,102 @@ export function creaScena(
       camera,
     );
     const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
-    if (hit) onPoint({ x: hit.x, z: hit.z }, click);
+    return hit ? { x: hit.x, z: hit.z } : null;
   };
-  const move = (e: PointerEvent) => pointer(e, false),
-    click = (e: PointerEvent) => pointer(e, true);
+  const onCue = (p: Vec2) => {
+    const cue = currentBalls.find((b) => b.id === 0);
+    if (!cue || !cueGroup.visible || !canStrike) return false;
+    const dx = p.x - cue.x,
+      dz = p.z - cue.z;
+    const along = dx * Math.cos(currentAngle) + dz * Math.sin(currentAngle);
+    const across = Math.abs(
+      -dx * Math.sin(currentAngle) + dz * Math.cos(currentAngle),
+    );
+    return along > -4.15 && along < -0.18 && across < 0.32;
+  };
+  const updateCharge = (event: PointerEvent) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const p = pointerPoint(event);
+    if (!p) return;
+    const pull = -(
+      (p.x - drag.anchor.x) * Math.cos(drag.angle) +
+      (p.z - drag.anchor.z) * Math.sin(drag.angle)
+    );
+    drag.power = Math.max(0, Math.min(1, pull / 1.7));
+    commands.onCharge(drag.power);
+  };
+  const move = (event: PointerEvent) => {
+    if (drag) {
+      event.preventDefault();
+      updateCharge(event);
+      return;
+    }
+    const p = pointerPoint(event);
+    if (!p) return;
+    const hoveringCue = onCue(p);
+    renderer.domElement.style.cursor = hoveringCue ? "grab" : "crosshair";
+    // Il passaggio sulla stecca non cambia la mira mentre la si afferra.
+    if (!hoveringCue && event.pointerId === aimingPointer) onPoint(p, false);
+  };
+  const click = (event: PointerEvent) => {
+    if (
+      !event.isPrimary ||
+      event.button !== 0 ||
+      document.querySelector("dialog[open]")
+    )
+      return;
+    const p = pointerPoint(event);
+    if (!p) return;
+    renderer.domElement.focus({ preventScroll: true });
+    if (onCue(p)) {
+      event.preventDefault();
+      drag = {
+        pointerId: event.pointerId,
+        anchor: p,
+        angle: currentAngle,
+        power: 0,
+      };
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.style.cursor = "grabbing";
+      commands.onCharge(0);
+    } else {
+      aimingPointer = event.pointerId;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      onPoint(p, true);
+    }
+  };
+  const release = (event: PointerEvent) => {
+    if (event.pointerId === aimingPointer) {
+      aimingPointer = null;
+      if (renderer.domElement.hasPointerCapture(event.pointerId))
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      return;
+    }
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    updateCharge(event);
+    const power = drag.power;
+    cancelDrag();
+    // Un semplice clic o una trazione in avanti non fa partire il colpo.
+    if (canStrike && power >= 0.08 && !document.querySelector("dialog[open]"))
+      commands.onRelease(power);
+  };
+  const cancel = () => {
+    const id = aimingPointer;
+    aimingPointer = null;
+    if (id !== null && renderer.domElement.hasPointerCapture(id))
+      renderer.domElement.releasePointerCapture(id);
+    cancelDrag();
+  };
+  const escape = (event: KeyboardEvent) => {
+    if (event.key === "Escape") cancel();
+  };
   renderer.domElement.addEventListener("pointermove", move);
   renderer.domElement.addEventListener("pointerdown", click);
+  renderer.domElement.addEventListener("pointerup", release);
+  renderer.domElement.addEventListener("pointercancel", cancel);
+  renderer.domElement.addEventListener("lostpointercapture", cancel);
+  window.addEventListener("blur", cancel);
+  window.addEventListener("keydown", escape);
   resize();
   return {
     balls(balls: Palla[]) {
@@ -358,13 +477,25 @@ export function creaScena(
       }
       renderer.render(scene, camera);
     },
-    aim(angle: number, visible: boolean, guide: boolean, skin: StileStecca) {
+    aim(
+      angle: number,
+      visible: boolean,
+      guide: boolean,
+      skin: StileStecca,
+      charge: number | null,
+    ) {
+      currentAngle = angle;
       const cue = currentBalls.find((b) => b.id === 0);
       cueGroup.visible = visible;
       line.visible = visible && guide;
       targetRing.visible = visible && guide;
       if (cue) {
-        cueGroup.position.set(cue.x, 0.21, cue.z);
+        const pullback = (charge ?? 0) * 1.3;
+        cueGroup.position.set(
+          cue.x - Math.cos(angle) * pullback,
+          0.21,
+          cue.z - Math.sin(angle) * pullback,
+        );
         cueGroup.rotation.y = -angle;
         cueGroup.rotation.z = -0.045;
         let length = 3.5;
@@ -405,13 +536,27 @@ export function creaScena(
       renderer.render(scene, camera);
     },
     view(value: boolean) {
+      cancel();
       top = value;
       resize();
     },
+    interaction(enabled: boolean, id: number) {
+      canStrike = enabled;
+      if (!enabled || gameId !== id) cancel();
+      gameId = id;
+    },
     dispose() {
+      // I callback React non vengono richiamati durante lo smontaggio.
+      drag = null;
+      aimingPointer = null;
       observer.disconnect();
       renderer.domElement.removeEventListener("pointermove", move);
       renderer.domElement.removeEventListener("pointerdown", click);
+      renderer.domElement.removeEventListener("pointerup", release);
+      renderer.domElement.removeEventListener("pointercancel", cancel);
+      renderer.domElement.removeEventListener("lostpointercapture", cancel);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("keydown", escape);
       const materials = new Set<THREE.Material>(),
         textures = new Set<THREE.Texture>();
       scene.traverse((o) => {

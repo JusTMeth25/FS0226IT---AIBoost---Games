@@ -138,9 +138,14 @@ export default function App() {
             </ol>
             <h3>Il tuo tiro, a modo tuo</h3>
             <p>
-              Muovi il mouse o tocca il tavolo per mirare. Regola la potenza e
-              premi Tira. Da tastiera puoi usare il campo dell’angolo, i
-              pulsanti di mira e il cursore di potenza. Con palla in mano puoi
+              Clicca o tocca il panno per fissare la mira; tenendo premuto puoi
+              regolarla con il puntatore. Afferra la stecca, trascinala indietro
+              lungo la sua direzione e rilascia: più la arretri, più il colpo è
+              potente. Esc annulla il caricamento. Da tastiera usa le frecce per
+              la mira, Shift + frecce per la regolazione fine e Spazio per
+              tirare con la potenza impostata. Puoi anche usare il pulsante Tira
+              e il cursore di potenza. Le scorciatoie restano sospese mentre
+              compili un campo o apri una finestra. Con palla in mano puoi
               scegliere un punto sul tavolo oppure le coordinate X/Z.
             </p>
             <p className="rules-variant">
