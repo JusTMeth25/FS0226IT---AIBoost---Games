@@ -10,9 +10,13 @@
     "preview": "vite preview",
     "verifica": "node scripts/verifica.ts",
     "torneo": "node scripts/verifica.ts --torneo",
-    "agenti:prepara": "node scripts/prepara-agenti.mjs"
+    "agenti:prepara": "node scripts/prepara-agenti.mjs",
+    "test:e2e": "playwright test",
+    "format": "prettier --write src scripts tests *.ts *.json *.md"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/dm-serif-display": "^5.3.0",
     "lucide-react": "^1.54.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -30,6 +34,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
     "globals": "^17.11.0",
+    "prettier": "^3.9.9",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.2"
