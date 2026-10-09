@@ -13,6 +13,22 @@ npm run dev
 
 Apri l'indirizzo stampato da Vite, normalmente `http://localhost:5173`. Per la versione compilata: `npm run build` e `npm run preview`.
 
+## GitHub Pages
+
+Indirizzo del sito: [Micio Club](https://justmeth25.github.io/FS0226IT---AIBoost---Games/).
+
+Il workflow `.github/workflows/pages.yml` nella radice del repository verifica regole e bot, esegue lint e build di `FE`, quindi pubblica `FE/dist`. Parte automaticamente quando vengono inviati aggiornamenti del frontend su `main`; può essere avviato anche da Actions. La sorgente di Pages è **GitHub Actions**.
+
+La variabile `GITHUB_PAGES_BASE` configura il prefisso `/<repository>/` per HTML, JavaScript, font e worker. In sviluppo è assente e il sito continua a funzionare su `/`. Per controllare localmente la build Pages in PowerShell:
+
+```powershell
+$env:GITHUB_PAGES_BASE = '/FS0226IT---AIBoost---Games/'
+npm run build
+npm run preview
+```
+
+Apri `http://localhost:4173/FS0226IT---AIBoost---Games/`. Per ritornare alla build locale normale: `Remove-Item Env:GITHUB_PAGES_BASE`.
+
 ## Come giocare
 
 Scegli Milo (facile), Luna (medio) o Nero (difficile). Clicca/tocca il panno per fissare la mira; puoi regolarla tenendo premuto e trascinando sul panno. Afferra la stecca, arretrala lungo il suo asse e rilascia per tirare: la distanza regola la potenza. Un semplice clic sulla stecca non tira. Esc annulla la carica.
@@ -28,6 +44,8 @@ Con palla in mano, scegli una posizione libera con il puntatore o i campi X/Z. P
 Regole ricreative ispirate alla [palla a 8 WPA](https://wpapool.com/rules/): gruppi assegnati dopo la spaccata, primo contatto con una propria palla, sponda o imbucata dopo il contatto, palla in mano dopo un fallo e 8 per ultima nella buca dichiarata. Sono dichiarate le semplificazioni: chiamata solo sulla 8, palla in mano sempre su tutto il tavolo, nessuna opzione di ripetere la spaccata, salti o spin. Non è un simulatore integrale del regolamento da torneo.
 
 ## Verifica
+
+La build pubblicata si controlla con `node scripts/verifica-pages.mjs`: verifica asset, tavolo 3D e un tiro reale del bot. Lo script accetta anche un URL locale come argomento e richiede il browser Chromium di Playwright.
 
 ```sh
 npm run verifica
@@ -67,4 +85,4 @@ Sono state applicate le skill ufficiali di [Superpowers](https://github.com/obra
 
 Rendering 3D, fisica deterministica nel piano del tavolo: attrito, urti elastici approssimati e sponde. Servono browser moderno e WebGL; l'app mostra una possibilità di recupero se il renderer non può avviarsi. Il bot difficile ha un limite di iterazioni e una guardia temporale che può ridurre la ricerca sui dispositivi lenti. Nessun servizio remoto viene chiamato durante una partita; anche i font sono serviti localmente.
 
-[PRODUCT.md](PRODUCT.md) descrive il prodotto. [DESIGN.md](DESIGN.md) e `.impeccable/design.json` fissano il design implementato. Gli screenshot di verifica sono in `.impeccable/review/`, esclusi da Git. I tre worktree sono conservati per rendere ispezionabile la consegna. Clonazione di altri giochi e pubblicazione GitHub sono fasi successive alla prima iterazione richiesta.
+[PRODUCT.md](PRODUCT.md) descrive il prodotto. [DESIGN.md](DESIGN.md) e `.impeccable/design.json` fissano il design implementato. Gli screenshot di verifica sono in `.impeccable/review/`, esclusi da Git. I tre worktree sono conservati per rendere ispezionabile la consegna. La clonazione di altri giochi resta una fase successiva. La pubblicazione su GitHub Pages è configurata dal workflow descritto sopra.
